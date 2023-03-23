@@ -34,6 +34,15 @@ impl MapEntry {
     }
 }
 
+impl Clone for MapEntry {
+    fn clone(&self) -> MapEntry {
+        MapEntry {
+            source: self.source.clone(),
+            ..*self
+        }
+    }
+}
+
 /// An address space.
 pub struct AddressSpace {
     name: String,
@@ -126,6 +135,8 @@ impl AddressSpace {
         source: Arc<D>,
         start: VirtualAddress,
     ) -> Result<(), &str> {
+        let start_addr = self.get_mapping_for_addr(start);
+        self.mappings.remove(start_addr);
         todo!()
         // Find mapping at start, err if non existent
         // if start. != none { }
@@ -147,14 +158,15 @@ impl AddressSpace {
     }
 
     /// Helper function for looking up mappings
-    fn get_mapping_for_addr(&self, addr: VirtualAddress) -> Result<MapEntry, &str> {
+    fn get_mapping_for_addr(self, addr: VirtualAddress) -> Result<MapEntry, &'static str> {
         //find overlaps. Useful for the two aboc.
-        for x in self.mappings {
-            if x.addr == addr {
-                return Ok(x);
+        for x in self.mappings.iter() {
+            if x.addr <= addr && addr <= x.addr + x.span {
+                // check if addr in span
+                return Ok(x.clone());
             }
         }
-        Err("No such addr in mapping");
+        Err("No such addr in mapping")
     }
 }
 
