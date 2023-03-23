@@ -12,12 +12,18 @@ struct MapEntry {
     offset: usize,
     span: usize,
     addr: usize,
-    flags: FlagBuilder
+    flags: FlagBuilder,
 }
 
 impl MapEntry {
     #[must_use] // <- not using return value of "new" doesn't make sense, so warn
-    pub fn new(source: Arc<dyn DataSource>, offset: usize, span: usize, addr: usize, flags: FlagBuilder) -> MapEntry {
+    pub fn new(
+        source: Arc<dyn DataSource>,
+        offset: usize,
+        span: usize,
+        addr: usize,
+        flags: FlagBuilder,
+    ) -> MapEntry {
         MapEntry {
             source: source.clone(),
             offset,
@@ -61,9 +67,9 @@ impl AddressSpace {
     /// TODO: how does our test in lib.rs succeed?
     // pub fn add_mapping<'a, D: DataSource + 'a>(
     //     &'a mut self,
-    pub fn add_mapping<D: DataSource + 'static>(
+    pub fn add_mapping(
         &mut self,
-        source: Arc<D>,
+        source: Arc<dyn DataSource>,
         offset: usize,
         span: usize,
         flags: FlagBuilder,
@@ -91,15 +97,24 @@ impl AddressSpace {
     ///
     /// # Errors
     /// If there is insufficient room subsequent to `start`.
-    pub fn add_mapping_at<D: DataSource + 'static>(
+    pub fn add_mapping_at(
         &mut self,
-        source: Arc<D>,
+        source: Arc<dyn DataSource>,
         offset: usize,
         span: usize,
         start: VirtualAddress,
-        flags: FlagBuilder
+        flags: FlagBuilder,
     ) -> Result<(), &str> {
-        todo!()
+        // same as add_mapping (check it is alligned, doesn't overlap, and within range)
+        // Add in start
+        if start + span + 2 * PAGE_SIZE < VADDR_MAX {
+            let mapping_addr = start + PAGE_SIZE;
+            let new_mapping = MapEntry::new(source, offset, span, mapping_addr, flags);
+            self.mappings.push(new_mapping);
+            self.mappings.sort_by(|a, b| a.addr.cmp(&b.addr));
+            return Ok(()); // reply empty?
+        }
+        Err("out of address space!")
     }
 
     /// Remove the mapping to `DataSource` that starts at the given address.
@@ -112,6 +127,8 @@ impl AddressSpace {
         start: VirtualAddress,
     ) -> Result<(), &str> {
         todo!()
+        // Find mapping at start, err if non existent
+        // if start. != none { }
     }
 
     /// Look up the DataSource and offset within that DataSource for a
@@ -126,11 +143,18 @@ impl AddressSpace {
         access_type: FlagBuilder,
     ) -> Result<(Arc<D>, usize), &str> {
         todo!();
+        // Find covering for region,
     }
 
     /// Helper function for looking up mappings
     fn get_mapping_for_addr(&self, addr: VirtualAddress) -> Result<MapEntry, &str> {
-        todo!();
+        //find overlaps. Useful for the two aboc.
+        for x in self.mappings {
+            if x.addr == addr {
+                return Ok(x);
+            }
+        }
+        Err("No such addr in mapping");
     }
 }
 
@@ -160,17 +184,21 @@ pub struct FlagBuilder {
 
 impl FlagBuilder {
     pub fn check_access_perms(&self, access_perms: FlagBuilder) -> bool {
-        if access_perms.read && !self.read || access_perms.write && !self.write || access_perms.execute && !self.execute {
+        if access_perms.read && !self.read
+            || access_perms.write && !self.write
+            || access_perms.execute && !self.execute
+        {
             return false;
-        }    
-        true    
+        }
+        true
     }
 
     pub fn is_valid(&self) -> bool {
         if self.private && self.shared {
             return false;
         }
-        if self.cow && self.write { // for COW to work, write needs to be off until after the copy
+        if self.cow && self.write {
+            // for COW to work, write needs to be off until after the copy
             return false;
         }
         return true;
