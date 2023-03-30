@@ -131,13 +131,19 @@ impl AddressSpace {
     /// # Errors
     /// If the mapping could not be removed.
     pub fn remove_mapping<D: DataSource>(
-        &self,
+        &mut self,
         source: Arc<D>,
         start: VirtualAddress,
     ) -> Result<(), &str> {
+        // Help from Alex
         let start_addr = self.get_mapping_for_addr(start);
-        self.mappings.remove(start_addr);
-        todo!()
+        if let Ok(start_addr) = start_addr {
+            self.mappings.remove(start_addr.addr);
+            Ok(())
+        } else {
+            Err("Mapping not removed.")
+        }
+
         // Find mapping at start, err if non existent
         // if start. != none { }
     }
@@ -158,7 +164,7 @@ impl AddressSpace {
     }
 
     /// Helper function for looking up mappings
-    fn get_mapping_for_addr(self, addr: VirtualAddress) -> Result<MapEntry, &'static str> {
+    fn get_mapping_for_addr(&self, addr: VirtualAddress) -> Result<MapEntry, &'static str> {
         //find overlaps. Useful for the two aboc.
         for x in self.mappings.iter() {
             if x.addr <= addr && addr <= x.addr + x.span {
