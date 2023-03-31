@@ -130,9 +130,9 @@ impl AddressSpace {
     ///
     /// # Errors
     /// If the mapping could not be removed.
-    pub fn remove_mapping<D: DataSource>(
+    pub fn remove_mapping(
         &mut self,
-        source: Arc<D>,
+        source: Arc<dyn DataSource>,
         start: VirtualAddress,
     ) -> Result<(), &str> {
         // Help from Alex
@@ -154,13 +154,23 @@ impl AddressSpace {
     /// # Errors
     /// If this VirtualAddress does not have a valid mapping in &self,
     /// or if this AccessType is not permitted by the mapping
-    pub fn get_source_for_addr<D: DataSource>(
+    pub fn get_source_for_addr(
         &self,
         addr: VirtualAddress,
         access_type: FlagBuilder,
-    ) -> Result<(Arc<D>, usize), &str> {
-        todo!();
-        // Find covering for region,
+    ) -> Result<(Arc<dyn DataSource>, usize), &str> {
+        // Find covering for region, help from alex
+        if let Ok(mapping) = self.get_mapping_for_addr(addr) {
+            // check perms
+            // return offset
+            if mapping.flags.check_access_perms(access_type) {
+                Ok((mapping.source.clone(), addr - mapping.addr))
+            } else {
+                Err("Access not granted")
+            }
+        } else {
+            Err("Can't get source for addr")
+        }
     }
 
     /// Helper function for looking up mappings
